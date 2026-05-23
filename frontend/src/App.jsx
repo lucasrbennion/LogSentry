@@ -1,74 +1,122 @@
-import React, { useEffect, useState } from "react";
-import SummaryCards from "./components/SummaryCards";
-import EventTable from "./components/EventTable";
-import EventDetailPanel from "./components/EventDetailPanel";
-import FilterBar from "./components/FilterBar";
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from './assets/vite.svg'
+import heroImg from './assets/hero.png'
+import './App.css'
 
-const samplePayload = {
-  summary: {
-    total_events: 3,
-    priority_breakdown: { P2: 1, P3: 1, P4: 1 },
-    event_id_breakdown: { 4624: 1, 4625: 1, 4672: 1 },
-  },
-  results: [
-    {
-      event_id: 4624,
-      timestamp: "2026-05-23T19:00:00",
-      account: "testuser1",
-      machine_name: "WIN-H96JM6F374S",
-      logon_type: "2",
-      priority: "P4",
-      recommended_owner: "Infrastructure / Operations",
-      explanation: "R010: Successful interactive logon by a non-admin test account.",
-    },
-    {
-      event_id: 4625,
-      timestamp: "2026-05-23T19:01:00",
-      account: "testuser1",
-      machine_name: "WIN-H96JM6F374S",
-      logon_type: "2",
-      priority: "P3",
-      recommended_owner: "SOC / Security Operations",
-      explanation: "R020: Failed logon detected; requires authentication review.",
-    },
-    {
-      event_id: 4672,
-      timestamp: "2026-05-23T19:01:48",
-      account: "labadmin",
-      machine_name: "WIN-H96JM6F374S",
-      logon_type: null,
-      priority: "P2",
-      recommended_owner: "SOC / Security Operations",
-      explanation: "R030: Special privileges assigned to labadmin.",
-    },
-  ],
-};
-
-export default function App() {
-  const [data, setData] = useState(samplePayload);
-  const [selected, setSelected] = useState(null);
-  const [priorityFilter, setPriorityFilter] = useState("ALL");
-
-  useEffect(() => {
-    setSelected(samplePayload.results[0]);
-  }, []);
-
-  const filteredResults = data.results.filter((row) =>
-    priorityFilter === "ALL" ? true : row.priority === priorityFilter
-  );
+function App() {
+  const [count, setCount] = useState(0)
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 24, maxWidth: 1200, margin: "0 auto" }}>
-      <h1>LogSentry</h1>
-      <p>Rule-based triage and prioritisation of Windows Security Event Logs.</p>
+    <>
+      <section id="center">
+        <div className="hero">
+          <img src={heroImg} className="base" width="170" height="179" alt="" />
+          <img src={reactLogo} className="framework" alt="React logo" />
+          <img src={viteLogo} className="vite" alt="Vite logo" />
+        </div>
+        <div>
+          <h1>Get started</h1>
+          <p>
+            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
+          </p>
+        </div>
+        <button
+          type="button"
+          className="counter"
+          onClick={() => setCount((count) => count + 1)}
+        >
+          Count is {count}
+        </button>
+      </section>
 
-      <SummaryCards summary={data.summary} />
-      <FilterBar priorityFilter={priorityFilter} setPriorityFilter={setPriorityFilter} />
+      <div className="ticks"></div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginTop: 16 }}>
-        <EventTable rows={filteredResults} onSelect={setSelected} />
-        <EventDetailPanel event={selected} />
-      </div>
-    </div>
-  );
+      <section id="next-steps">
+        <div id="docs">
+          <svg className="icon" role="presentation" aria-hidden="true">
+            <use href="/icons.svg#documentation-icon"></use>
+          </svg>
+          <h2>Documentation</h2>
+          <p>Your questions, answered</p>
+          <ul>
+            <li>
+              <a href="https://vite.dev/" target="_blank">
+                <img className="logo" src={viteLogo} alt="" />
+                Explore Vite
+              </a>
+            </li>
+            <li>
+              <a href="https://react.dev/" target="_blank">
+                <img className="button-icon" src={reactLogo} alt="" />
+                Learn more
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div id="social">
+          <svg className="icon" role="presentation" aria-hidden="true">
+            <use href="/icons.svg#social-icon"></use>
+          </svg>
+          <h2>Connect with us</h2>
+          <p>Join the Vite community</p>
+          <ul>
+            <li>
+              <a href="https://github.com/vitejs/vite" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#github-icon"></use>
+                </svg>
+                GitHub
+              </a>
+            </li>
+            <li>
+              <a href="https://chat.vite.dev/" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#discord-icon"></use>
+                </svg>
+                Discord
+              </a>
+            </li>
+            <li>
+              <a href="https://x.com/vite_js" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#x-icon"></use>
+                </svg>
+                X.com
+              </a>
+            </li>
+            <li>
+              <a href="https://bsky.app/profile/vite.dev" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#bluesky-icon"></use>
+                </svg>
+                Bluesky
+              </a>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <div className="ticks"></div>
+      <section id="spacer"></section>
+    </>
+  )
 }
+
+export default App
