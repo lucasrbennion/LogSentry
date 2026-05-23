@@ -1,0 +1,52 @@
+{
+  "events": [
+    {
+      "event_id": 4624,
+      "timestamp": "2026-05-23T19:00:00",
+      "machine_name": "WIN-H96JM6F374S",
+      "new_logon_account": "testuser1",
+      "new_logon_domain": "WIN-H96JM6F374S",
+      "subject_account": "WIN-H96JM6F374S$",
+      "subject_domain": "WORKGROUP",
+      "logon_type": "2",
+      "elevated_token": "No",
+      "workstation_name": "WIN-H96JM6F374S",
+      "source_network_address": "127.0.0.1",
+      "logon_process": "User32",
+      "authentication_package": "Negotiate",
+      "scenario_id": "S05"
+    },
+    {
+      "event_id": 4625,
+      "timestamp": "2026-05-23T19:01:00",
+      "machine_name": "WIN-H96JM6F374S",
+      "target_account": "testuser1",
+      "target_domain": "WIN-H96JM6F374S",
+      "subject_account": "WIN-H96JM6F374S$",
+      "subject_domain": "WORKGROUP",
+      "logon_type": "2",
+      "failure_reason": "Unknown user name or bad password.",
+      "status": "0xC000006D",
+      "substatus": "0xC000006A",
+      "workstation_name": "WIN-H96JM6F374S",
+      "source_network_address": "127.0.0.1",
+      "logon_process": "User32",
+      "authentication_package": "Negotiate",
+      "scenario_id": "S06"
+    },
+    {
+      "event_id": 4672,
+      "timestamp": "2026-05-23T19:01:48",
+      "machine_name": "WIN-H96JM6F374S",
+      "subject_account": "labadmin",
+      "subject_domain": "WIN-H96JM6F374S",
+      "privileges": [
+        "SeSecurityPrivilege",
+        "SeTakeOwnershipPrivilege",
+        "SeLoadDriverPrivilege",
+        "SeBackupPrivilege"
+      ],
+      "scenario_id": "S07"
+    }
+  ]
+}

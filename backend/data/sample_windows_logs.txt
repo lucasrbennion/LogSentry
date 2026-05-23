@@ -1,0 +1,80 @@
+TimeCreated  : 23/05/2026 19:01:48
+Id           : 4672
+ProviderName : Microsoft-Windows-Security-Auditing
+MachineName  : WIN-H96JM6F374S
+Message      : Special privileges assigned to new logon.
+
+               Subject:
+               	Security ID:		S-1-5-21-1843355061-959072039-615746888-1010
+               	Account Name:		labadmin
+               	Account Domain:		WIN-H96JM6F374S
+               	Logon ID:		0x165233
+
+               Privileges:		SeSecurityPrivilege
+               			SeTakeOwnershipPrivilege
+               			SeLoadDriverPrivilege
+               			SeBackupPrivilege
+
+TimeCreated  : 23/05/2026 19:01:00
+Id           : 4625
+ProviderName : Microsoft-Windows-Security-Auditing
+MachineName  : WIN-H96JM6F374S
+Message      : An account failed to log on.
+
+               Subject:
+               	Security ID:		S-1-5-18
+               	Account Name:		WIN-H96JM6F374S$
+               	Account Domain:		WORKGROUP
+               	Logon ID:		0x3E7
+
+               Logon Type:			2
+
+               Account For Which Logon Failed:
+               	Security ID:		S-1-0-0
+               	Account Name:		testuser1
+               	Account Domain:		WIN-H96JM6F374S
+
+               Failure Information:
+               	Failure Reason:		Unknown user name or bad password.
+               	Status:			0xC000006D
+               	Sub Status:		0xC000006A
+
+               Process Information:
+               	Caller Process Name:	C:\Windows\System32\svchost.exe
+
+               Network Information:
+               	Workstation Name:	WIN-H96JM6F374S
+               	Source Network Address:	127.0.0.1
+               	Source Port:		0
+
+TimeCreated  : 23/05/2026 19:00:00
+Id           : 4624
+ProviderName : Microsoft-Windows-Security-Auditing
+MachineName  : WIN-H96JM6F374S
+Message      : An account was successfully logged on.
+
+               Subject:
+               	Security ID:		S-1-5-18
+               	Account Name:		WIN-H96JM6F374S$
+               	Account Domain:		WORKGROUP
+               	Logon ID:		0x3E7
+
+               Logon Information:
+               	Logon Type:		2
+               	Restricted Admin Mode:	-
+               	Virtual Account:		No
+               	Elevated Token:		No
+
+               New Logon:
+               	Security ID:		S-1-5-21-1843355061-959072039-615746888-1013
+               	Account Name:		testuser1
+               	Account Domain:		WIN-H96JM6F374S
+               	Logon ID:		0xB7E63
+
+               Process Information:
+               	Process Name:		C:\Windows\System32\svchost.exe
+
+               Network Information:
+               	Workstation Name:	WIN-H96JM6F374S
+               	Source Network Address:	127.0.0.1
+               	Source Port:		0
