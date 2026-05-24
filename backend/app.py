@@ -5,7 +5,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request 
 
-from parser import normalize_event, parse_file
+from parser import normalize_event, normalize_events, parse_file
 from rules import evaluate_event
 from scoring import score_event, summarise_results
 
@@ -44,7 +44,7 @@ def triage():
     if not raw_events:
         return jsonify({"error": "No events provided in payload"}), 400
 
-    normalized = normalize_event(raw_events)
+    normalized = normalize_events(raw_events)
     output = run_triage(normalized)
     return jsonify(output)
 

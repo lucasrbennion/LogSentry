@@ -152,6 +152,8 @@ def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
         "raw_record": event.get("raw_record"),
     }
 
+def normalize_events(events: list[dict]) -> list[dict]:
+    return [normalize_event(event) for event in events]
 
 def parse_text(text: str) -> List[Dict[str, Any]]:
     records = split_records(text)
