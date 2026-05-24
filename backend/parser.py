@@ -23,13 +23,18 @@ def _ensure_section(container: Dict[str, Any], section: str) -> Dict[str, Any]:
 
 
 def parse_record(record_text: str) -> Dict[str, Any]:
-    lines = [line.rstrip("\n") for line in record_text.splitlines() if line.strip() != ""]
+    lines = [line.rstrip("\n") for line in record_text.splitlines()]
     event: Dict[str, Any] = {"raw_record": record_text}
     current_section: Optional[str] = None
     last_key: Optional[str] = None
 
     for line in lines:
         line = line.expandtabs(4)
+        
+        if line.strip() == "":
+            current_section = None
+            last_key = None
+            continue
 
         # top level fields
         m_top = TOP_FIELD_RE.match(line.strip())

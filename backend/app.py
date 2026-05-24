@@ -5,7 +5,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request 
 
-from parser import normalize_event, normalize_events, parse_file
+from parser import normalize_events, parse_file
 from rules import evaluate_event
 from scoring import score_event, summarise_results
 
