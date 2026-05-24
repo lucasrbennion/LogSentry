@@ -1,32 +1,49 @@
-import React from "react";
-import PriorityBadge from "./PriorityBadge";
+import PriorityBadge from './PriorityBadge'
 
-export default function EventTable({ rows, onSelect }) {
+export default function EventTable({ rows, onSelect, selected }) {
+  if (!rows.length) {
+    return <p className="muted-text">No events match the current filter.</p>
+  }
+
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
-      <thead>
-        <tr>
-          <th style={th}>Time</th>
-          <th style={th}>Event ID</th>
-          <th style={th}>Account</th>
-          <th style={th}>Priority</th>
-          <th style={th}>Owner</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, idx) => (
-          <tr key={idx} style={{ cursor: "pointer" }} onClick={() => onSelect(row)}>
-            <td style={td}>{row.timestamp}</td>
-            <td style={td}>{row.event_id}</td>
-            <td style={td}>{row.account}</td>
-            <td style={td}><PriorityBadge priority={row.priority} /></td>
-            <td style={td}>{row.recommended_owner}</td>
+    <div className="table-wrap">
+      <table className="event-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Event ID</th>
+            <th>Account</th>
+            <th>Logon Type</th>
+            <th>Priority</th>
+            <th>Owner</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
+        </thead>
+        <tbody>
+          {rows.map((row, index) => {
+            const isSelected =
+              selected?.event_id === row.event_id &&
+              selected?.timestamp === row.timestamp &&
+              selected?.account === row.account
 
-const th = { textAlign: "left", borderBottom: "1px solid #ccc", padding: 8 };
-const td = { borderBottom: "1px solid #eee", padding: 8 };
+            return (
+              <tr
+                key={`${row.event_id}-${row.timestamp}-${index}`}
+                className={isSelected ? 'selected-row' : ''}
+                onClick={() => onSelect(row)}
+              >
+                <td>{row.timestamp || '-'}</td>
+                <td>{row.event_id}</td>
+                <td>{row.account || '-'}</td>
+                <td>{row.logon_type || '-'}</td>
+                <td>
+                  <PriorityBadge priority={row.priority} />
+                </td>
+                <td>{row.recommended_owner || '-'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}

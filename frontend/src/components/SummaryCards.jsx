@@ -1,27 +1,45 @@
-import React from "react";
-
 export default function SummaryCards({ summary }) {
-  const priorities = Object.entries(summary.priority_breakdown || {});
-  return (
-    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
-      <div style={cardStyle}>
-        <strong>Total events</strong>
-        <div>{summary.total_events}</div>
-      </div>
-      {priorities.map(([priority, count]) => (
-        <div key={priority} style={cardStyle}>
-          <strong>{priority}</strong>
-          <div>{count}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
+  const priorityBreakdown = Object.entries(summary?.priority_breakdown || {})
+  const eventBreakdown = Object.entries(summary?.event_id_breakdown || {})
 
-const cardStyle = {
-  border: "1px solid #ddd",
-  borderRadius: 12,
-  padding: 16,
-  minWidth: 120,
-  background: "#fafafa",
-};
+  return (
+    <section className="summary-grid">
+      <div className="summary-card">
+        <span className="summary-label">Total events</span>
+        <strong className="summary-value">{summary?.total_events ?? 0}</strong>
+      </div>
+
+      <div className="summary-card">
+        <span className="summary-label">Priority breakdown</span>
+        <div className="stack-list">
+          {priorityBreakdown.length ? (
+            priorityBreakdown.map(([priority, count]) => (
+              <div key={priority} className="stack-row">
+                <span>{priority}</span>
+                <strong>{count}</strong>
+              </div>
+            ))
+          ) : (
+            <span className="muted-text">No data</span>
+          )}
+        </div>
+      </div>
+
+      <div className="summary-card">
+        <span className="summary-label">Event ID breakdown</span>
+        <div className="stack-list">
+          {eventBreakdown.length ? (
+            eventBreakdown.map(([eventId, count]) => (
+              <div key={eventId} className="stack-row">
+                <span>{eventId}</span>
+                <strong>{count}</strong>
+              </div>
+            ))
+          ) : (
+            <span className="muted-text">No data</span>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
