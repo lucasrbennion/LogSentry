@@ -25,6 +25,14 @@ export default function EventDetailPanel({ event }) {
             <dd>{event.account || '-'}</dd>
           </div>
           <div>
+            <dt>Provider</dt>
+            <dd>{event.provider_name || '-'}</dd>
+          </div>
+          <div>
+            <dt>Message</dt>
+            <dd>{event.message || '-'}</dd>
+          </div>
+          <div>
             <dt>Priority</dt>
             <dd>{event.priority || '-'}</dd>
           </div>

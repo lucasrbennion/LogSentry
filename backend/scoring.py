@@ -59,6 +59,8 @@ def score_event(event: Dict, rule_hits: List[Dict]) -> Dict:
             or event.get("subject_account")
         ),
         "machine_name": event.get("machine_name"),
+        "provider_name": event.get("provider_name"),
+        "message": event.get("message"),
         "logon_type": event.get("logon_type"),
         "priority": priority,
         "recommended_owner": owner,

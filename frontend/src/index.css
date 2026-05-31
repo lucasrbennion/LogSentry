@@ -168,6 +168,17 @@ button:disabled {
   border-collapse: collapse;
 }
 
+.event-table td:nth-child(4),
+.event-table th:nth-child(4) {
+  min-width: 260px;
+}
+
+.detail-list dd {
+  margin: 0;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
 .event-table th,
 .event-table td {
   text-align: left;
