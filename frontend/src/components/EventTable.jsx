@@ -13,6 +13,7 @@ export default function EventTable({ rows, onSelect, selected }) {
             <th>Time</th>
             <th>Event ID</th>
             <th>Account</th>
+            <th>Message</th>
             <th>Logon Type</th>
             <th>Priority</th>
             <th>Owner</th>
@@ -34,6 +35,7 @@ export default function EventTable({ rows, onSelect, selected }) {
                 <td>{row.timestamp || '-'}</td>
                 <td>{row.event_id}</td>
                 <td>{row.account || '-'}</td>
+                <td>{row.message || '-'}</td>
                 <td>{row.logon_type || '-'}</td>
                 <td>
                   <PriorityBadge priority={row.priority} />
