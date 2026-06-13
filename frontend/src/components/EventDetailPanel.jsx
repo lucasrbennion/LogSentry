@@ -1,9 +1,36 @@
+function AttackMappingList({ mappings }) {
+  // Render the ATT&CK classification clearly so the analyst can see both the
+  // tactic-level context and the specific technique that the rule mapped to.
+  if (!mappings?.length) {
+    return <p className="muted-text">No ATT&CK mapping assigned to this event.</p>
+  }
+
+  return (
+    <ul className="attack-list">
+      {mappings.map((mapping, index) => (
+        <li key={`${mapping.attack_technique_id || 'unmapped'}-${index}`}>
+          <div className="attack-title">
+            <strong>{mapping.attack_technique_id || 'Unmapped'}</strong>
+            {' · '}
+            <span>{mapping.attack_technique || 'No technique name'}</span>
+          </div>
+          <div className="attack-meta">
+            <span><strong>Tactic:</strong> {mapping.attack_tactic || '-'}</span>
+            <span><strong>Confidence:</strong> {mapping.attack_confidence || '-'}</span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export default function EventDetailPanel({ event }) {
   if (!event) {
     return <p className="muted-text">Select an event to inspect its details.</p>
   }
 
   const normalized = event.normalized_event || {}
+  const attackMappings = event.attack_mappings || []
 
   return (
     <div className="detail-panel">
@@ -25,10 +52,6 @@ export default function EventDetailPanel({ event }) {
             <dd>{event.account || '-'}</dd>
           </div>
           <div>
-            <dt>Provider</dt>
-            <dd>{event.provider_name || '-'}</dd>
-          </div>
-          <div>
             <dt>Message</dt>
             <dd>{event.message || '-'}</dd>
           </div>
@@ -45,6 +68,11 @@ export default function EventDetailPanel({ event }) {
             <dd>{event.explanation || '-'}</dd>
           </div>
         </dl>
+      </div>
+
+      <div className="detail-section">
+        <h3>MITRE ATT&amp;CK mapping</h3>
+        <AttackMappingList mappings={attackMappings} />
       </div>
 
       <div className="detail-section">

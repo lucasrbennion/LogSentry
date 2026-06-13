@@ -1,5 +1,17 @@
 import PriorityBadge from './PriorityBadge'
 
+function formatAttackMappings(attackMappings) {
+  // Show concise ATT&CK technique IDs in the table, because full tactic/technique names
+  // would make the grid too wide and noisy for quick triage.
+  if (!attackMappings?.length) {
+    return '-'
+  }
+
+  return attackMappings
+    .map((mapping) => mapping.attack_technique_id || 'Unmapped')
+    .join(', ')
+}
+
 export default function EventTable({ rows, onSelect, selected }) {
   if (!rows.length) {
     return <p className="muted-text">No events match the current filter.</p>
@@ -14,6 +26,7 @@ export default function EventTable({ rows, onSelect, selected }) {
             <th>Event ID</th>
             <th>Account</th>
             <th>Message</th>
+            <th>ATT&amp;CK</th>
             <th>Logon Type</th>
             <th>Priority</th>
             <th>Owner</th>
@@ -36,6 +49,7 @@ export default function EventTable({ rows, onSelect, selected }) {
                 <td>{row.event_id}</td>
                 <td>{row.account || '-'}</td>
                 <td>{row.message || '-'}</td>
+                <td>{formatAttackMappings(row.attack_mappings)}</td>
                 <td>{row.logon_type || '-'}</td>
                 <td>
                   <PriorityBadge priority={row.priority} />

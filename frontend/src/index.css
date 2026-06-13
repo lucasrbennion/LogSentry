@@ -291,3 +291,30 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* ATT&CK mapping block in the detail panel */
+.attack-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.attack-list li {
+  margin-bottom: 12px;
+}
+
+.attack-title {
+  margin-bottom: 4px;
+}
+
+.attack-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #5d6875;
+}
+
+/* Keep the ATT&CK column readable even when multiple mappings appear */
+.event-table td {
+  max-width: 260px;
+  word-break: break-word;
+}
