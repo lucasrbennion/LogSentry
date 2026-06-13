@@ -32,6 +32,8 @@ export default function EventDetailPanel({ event }) {
   const normalized = event.normalized_event || {}
   const attackMappings = event.attack_mappings || []
 
+  const scenarioId = event.scenario_id || normalized.scenario_id
+
   return (
     <div className="detail-panel">
       <h2>Event detail</h2>
@@ -39,6 +41,12 @@ export default function EventDetailPanel({ event }) {
       <div className="detail-section">
         <h3>Triage outcome</h3>
         <dl className="detail-list">
+          {scenarioId ? (
+            <div>
+              <dt>Scenario</dt>
+              <dd>{scenarioId}</dd>
+            </div>
+          ) : null}
           <div>
             <dt>Event ID</dt>
             <dd>{event.event_id}</dd>

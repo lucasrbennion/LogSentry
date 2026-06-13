@@ -1,8 +1,6 @@
 # scoring.py — converts rule hits into analyst-friendly priority levels and ownership assignments.
-#
 # After rules.py decides WHAT happened, this module decides HOW URGENT it is and
-# WHO should investigate.  It also produces a summary of the full triage run so
-# the caller can see high-level counts without scanning every individual result.
+# WHO should investigate.  It also produces a summary of the full triage run.
 
 from typing import Dict, List
 from collections import Counter
@@ -19,12 +17,7 @@ PRIORITY_MAP = {
 
 
 def extract_attack_mappings(rule_hits: List[Dict]) -> List[Dict]:
-    """
-    Pull out unique ATT&CK mappings from the matched rules.
-
-    Deduplication is based on technique ID + tactic + confidence so the frontend
-    receives a clean list even if multiple rules later point to the same technique.
-    """
+    """Pull out unique ATT&CK mappings from the matched rules."""
     seen = set()
     mappings = []
 
@@ -48,9 +41,7 @@ def extract_attack_mappings(rule_hits: List[Dict]) -> List[Dict]:
 
 
 def score_event(event: Dict, rule_hits: List[Dict]) -> Dict:
-    """
-    Turn matched rule hits into a scored triage result suitable for the API/UI.
-    """
+    """Turn matched rule hits into a scored triage result suitable for the API/UI."""
     effects = [rule["effect"] for rule in rule_hits]
     priority = "P4"
     owner = "Infrastructure / Operations"
@@ -66,6 +57,7 @@ def score_event(event: Dict, rule_hits: List[Dict]) -> Dict:
     return {
         "event_id": event.get("event_id"),
         "timestamp": event.get("timestamp"),
+        "scenario_id": event.get("scenario_id"),
         "account": event.get("new_logon_account") or event.get("target_account") or event.get("subject_account"),
         "machine_name": event.get("machine_name"),
         "provider_name": event.get("provider_name"),
@@ -81,9 +73,7 @@ def score_event(event: Dict, rule_hits: List[Dict]) -> Dict:
 
 
 def summarise_results(results: List[Dict]) -> Dict:
-    """
-    Build the summary block returned by the API and displayed by the frontend.
-    """
+    """Build the summary block returned by the API and displayed by the frontend."""
     priorities = Counter(r["priority"] for r in results)
     event_ids = Counter(r["event_id"] for r in results)
 

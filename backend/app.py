@@ -1,8 +1,16 @@
 # app.py — the main entry point for the LogSentry Flask API.
-# It exposes two POST endpoints: one that accepts raw JSON events and one that
-# accepts a file path pointing to a Windows event log text file.
-# Both endpoints run the events through the same normalise → rule-match → score pipeline.
+# It exposes:
+#   1. /triage           — triage event dicts passed directly in the request body
+#   2. /triage-file      — triage a raw Windows event-log text file by path
+#   3. /triage-json-file — triage a JSON file containing a large generated event dataset
+#
+# The JSON-file route is useful for scale testing because it avoids having to paste or
+# upload thousands of events through the frontend.  The frontend can simply provide a
+# file path, and the backend loads the dataset locally.
 
+from __future__ import annotations
+
+import json
 from pathlib import Path
 
 from flask import Flask, jsonify, request
@@ -15,47 +23,66 @@ app = Flask(__name__)
 
 
 def run_triage(events: list[dict]) -> dict:
-    """Run every event through the rule engine and scorer, then return a summary.
-
-    For each event:
-      1. evaluate_event  — checks which security rules fire
-      2. score_event     — assigns a priority level and recommended owner
-    After all events are processed, summarise_results produces aggregate counts.
-    """
+    """Run every event through the rule engine and scorer, then return a summary."""
     results = []
 
     for event in events:
-        rule_hits = evaluate_event(event)       # which rules matched this event
-        triaged = score_event(event, rule_hits)  # turn rule hits into a priority + owner
+        rule_hits = evaluate_event(event)
+        triaged = score_event(event, rule_hits)
         results.append(triaged)
 
-    summary = summarise_results(results)  # aggregate stats across all events
+    summary = summarise_results(results)
     return {"summary": summary, "results": results}
+
+
+def load_events_from_json_file(path: Path) -> list[dict]:
+    """Load an event list from a JSON file.
+
+    Supported file shapes:
+      1. A top-level list:
+           [ {...}, {...} ]
+
+      2. A dict with an "events" property:
+           { "events": [ {...}, {...} ] }
+
+    The returned list is still passed through normalize_events so the rest of the
+    backend can treat it exactly like any other input source.
+    """
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON file: {exc}") from exc
+
+    if isinstance(payload, list):
+        events = payload
+    elif isinstance(payload, dict):
+        events = payload.get("events", [])
+    else:
+        raise ValueError("JSON file must contain either a list of events or an object with an 'events' key.")
+
+    if not isinstance(events, list):
+        raise ValueError("'events' must be a list.")
+    if not events:
+        raise ValueError("No events found in JSON file.")
+
+    return events
 
 
 @app.get("/health")
 def health():
-    # Simple liveness check so load-balancers / monitoring tools can confirm the app is running.
+    """Simple liveness check used by the frontend and local debugging."""
     return jsonify({"status": "ok", "app": "LogSentry"})
 
 
 @app.post("/triage")
 def triage():
-    """Accept a list of pre-parsed event dicts and return triage results.
-
-    Expected request body:
-        { "events": [ { ...event dict... }, ... ] }
-
-    The events are first normalised (field names are standardised) and then
-    fed through the rule engine and scorer.
-    """
+    """Accept a list of event dicts directly in the request body and return triage results."""
     payload = request.get_json(silent=True) or {}
     raw_events = payload.get("events", [])
 
     if not raw_events:
         return jsonify({"error": "No events provided in payload"}), 400
 
-    # Normalise flattens provider-specific field names into a consistent schema.
     normalized = normalize_events(raw_events)
     output = run_triage(normalized)
     return jsonify(output)
@@ -63,13 +90,28 @@ def triage():
 
 @app.post("/triage-file")
 def triage_file():
-    """Accept a path to a raw Windows event log text file and return triage results.
+    """Accept a path to a raw Windows event-log text file and return triage results."""
+    payload = request.get_json(silent=True) or {}
+    file_path = payload.get("file_path")
 
-    Expected request body:
-        { "file_path": "C:\\\\path\\\\to\\\\sample_windows_logs.txt" }
+    if not file_path:
+        return jsonify({"error": "file_path is required"}), 400
 
-    The file is parsed from the raw Windows format, normalised, then triaged.
-    Use this endpoint when you have a raw log export rather than pre-parsed JSON.
+    path = Path(file_path)
+    if not path.exists():
+        return jsonify({"error": f"File not found: {file_path}"}), 404
+
+    parsed_events = parse_file(path)
+    output = run_triage(parsed_events)
+    return jsonify(output)
+
+
+@app.post("/triage-json-file")
+def triage_json_file():
+    """Accept a path to a JSON file containing a large event dataset and return triage results.
+
+    This route is intended for scale testing with generated datasets such as:
+      backend/data/generated/generated_events_2000.json
     """
     payload = request.get_json(silent=True) or {}
     file_path = payload.get("file_path")
@@ -81,13 +123,16 @@ def triage_file():
     if not path.exists():
         return jsonify({"error": f"File not found: {file_path}"}), 404
 
-    # parse_file handles reading the file and splitting it into individual event records.
-    parsed_events = parse_file(path)
-    output = run_triage(parsed_events)
+    try:
+        raw_events = load_events_from_json_file(path)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    normalized = normalize_events(raw_events)
+    output = run_triage(normalized)
     return jsonify(output)
 
 
 if __name__ == "__main__":
-    # Run the development server on localhost only.
-    # Do not expose debug=True on a production host.
+    # Development server only.
     app.run(debug=True, host="127.0.0.1", port=5000)

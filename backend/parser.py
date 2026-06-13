@@ -177,6 +177,68 @@ def parse_record(record_text: str) -> Dict[str, Any]:
 
     return event
 
+# These keys belong to LogSentry's own flat, normalised schema.  If we see one or more
+# of these on an input event, it is likely that the event is already normalised and
+# should not be re-parsed as if it were a raw nested Windows section structure.
+NORMALIZED_MARKER_KEYS = {
+    "subject_account",
+    "new_logon_account",
+    "target_account",
+    "source_network_address",
+    "scenario_id",
+}
+
+
+def _looks_normalized_event(event: Dict[str, Any]) -> bool:
+    """Return True if the incoming event already looks like LogSentry's flat schema.
+
+    This makes normalize_event idempotent:
+      - raw parsed Windows event dicts are flattened as before
+      - already-normalized events (such as generated JSON datasets) pass through cleanly
+    """
+    return "event_id" in event and any(key in event for key in NORMALIZED_MARKER_KEYS)
+
+
+def _normalize_pre_normalized_event(event: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a safe copy of an already-normalized event with missing fields defaulted."""
+    privileges = event.get("privileges") or []
+    if isinstance(privileges, str):
+        privileges = [privileges]
+
+    return {
+        "event_id": event.get("event_id"),
+        "timestamp": event.get("timestamp"),
+        "provider_name": event.get("provider_name"),
+        "machine_name": event.get("machine_name"),
+        "message": event.get("message"),
+        "subject_account": event.get("subject_account"),
+        "subject_domain": event.get("subject_domain"),
+        "subject_security_id": event.get("subject_security_id"),
+        "subject_logon_id": event.get("subject_logon_id"),
+        "new_logon_account": event.get("new_logon_account"),
+        "new_logon_domain": event.get("new_logon_domain"),
+        "new_logon_security_id": event.get("new_logon_security_id"),
+        "new_logon_logon_id": event.get("new_logon_logon_id"),
+        "target_account": event.get("target_account"),
+        "target_domain": event.get("target_domain"),
+        "target_security_id": event.get("target_security_id"),
+        "logon_type": event.get("logon_type"),
+        "elevated_token": event.get("elevated_token"),
+        "virtual_account": event.get("virtual_account"),
+        "restricted_admin_mode": event.get("restricted_admin_mode"),
+        "workstation_name": event.get("workstation_name"),
+        "source_network_address": event.get("source_network_address"),
+        "source_port": event.get("source_port"),
+        "process_name": event.get("process_name"),
+        "failure_reason": event.get("failure_reason"),
+        "status": event.get("status"),
+        "substatus": event.get("substatus"),
+        "logon_process": event.get("logon_process"),
+        "authentication_package": event.get("authentication_package"),
+        "privileges": privileges,
+        "scenario_id": event.get("scenario_id"),
+        "raw_record": event.get("raw_record"),
+    }
 
 def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
     """Flatten the nested parsed event dict into a single-level dict with consistent field names.
@@ -253,9 +315,13 @@ def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def normalize_events(events: list[dict]) -> list[dict]:
-    """Apply normalize_event to every event in a list and return the results."""
-    return [normalize_event(event) for event in events]
+    """Normalise every event in a list.
 
+    The function is intentionally idempotent:
+      - raw nested Windows events are flattened
+      - already-normalized events are passed through safely
+    """
+    return [normalize_event(event) for event in events]
 
 def parse_text(text: str) -> List[Dict[str, Any]]:
     """Parse a full multi-record log string into a list of normalised event dicts.
