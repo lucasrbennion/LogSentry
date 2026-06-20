@@ -1,20 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import SummaryCards from './components/SummaryCards'
 import EventTable from './components/EventTable'
-import EventDetailPanel from './components/EventDetailPanel'
 import FilterBar from './components/FilterBar'
 import PaginationControls from './components/PaginationControls'
-
-// Known local dataset paths used during development and dissertation demos.
-// These can be changed later if you move the project or replace the generated dataset.
-const SAMPLE_RAW_TEXT_FILE_PATH =
-  'C:\\PythonProjects\\LogSentry\\backend\\data\\sample_windows_logs.txt'
-
-const GENERATED_RAW_TEXT_FILE_PATH =
-  'C:\\PythonProjects\\LogSentry\\backend\\data\\generated\\generated_windows_logs_2000.txt'
-
-const GENERATED_JSON_FILE_PATH =
-  'C:\\PythonProjects\\LogSentry\\backend\\data\\generated\\generated_events_2000.json'
+import GeneratedFilePickerModal from './components/GeneratedFilePickerModal'
+import NormalizedEventModal from './components/NormalizedEventModal'
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250]
 
@@ -32,56 +22,86 @@ function sortResults(results) {
   })
 }
 
-function getEndpointForInputMode(inputMode) {
-  // Raw Windows log text goes to the parser-heavy route.
-  // Large generated JSON datasets go to the JSON-file route.
-  return inputMode === 'json_events' ? '/api/triage-json-file' : '/api/triage-file'
+function getEndpointForFile(file) {
+  // The selected file already carries a backend-generated "kind".
+  // That lets the UI route .txt and .json datasets cleanly without exposing
+  // any extra complexity to the user.
+  if (!file) return null
+  return file.kind === 'json_events' ? '/api/triage-json-file' : '/api/triage-file'
 }
 
 export default function App() {
-  const [inputMode, setInputMode] = useState('raw_text')
-  const [filePath, setFilePath] = useState(SAMPLE_RAW_TEXT_FILE_PATH)
+  const [availableFiles, setAvailableFiles] = useState([])
+  const [generatedFolder, setGeneratedFolder] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [isFilePickerOpen, setIsFilePickerOpen] = useState(false)
+
   const [data, setData] = useState(null)
-  const [selected, setSelected] = useState(null)
   const [priorityFilter, setPriorityFilter] = useState('ALL')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
 
-  function applyPreset(preset) {
-    // Presets make it easy to switch between the canonical small sample and the
-    // generated scale-test datasets without retyping long Windows paths by hand.
-    if (preset === 'sample_raw') {
-      setInputMode('raw_text')
-      setFilePath(SAMPLE_RAW_TEXT_FILE_PATH)
-      return
+  const [normalizedModalEvent, setNormalizedModalEvent] = useState(null)
+
+  async function fetchGeneratedFiles() {
+    // Load the default generated-data folder listing from the backend.
+    // This is the cleanest way to "point the app" to the correct folder
+    // without asking the user to type long Windows paths manually.
+    const response = await fetch('/api/generated-files')
+    const payload = await response.json()
+
+    if (!response.ok) {
+      throw new Error(payload.error || 'Failed to load generated files')
     }
 
-    if (preset === 'generated_raw') {
-      setInputMode('raw_text')
-      setFilePath(GENERATED_RAW_TEXT_FILE_PATH)
-      return
-    }
+    setGeneratedFolder(payload.folder || '')
+    setAvailableFiles(payload.files || [])
 
-    if (preset === 'generated_json') {
-      setInputMode('json_events')
-      setFilePath(GENERATED_JSON_FILE_PATH)
+    // Auto-select the first compatible file if nothing is currently selected.
+    if (!selectedFile && payload.files?.length) {
+      setSelectedFile(payload.files[0])
     }
   }
 
-  async function handleRunTriage(e) {
-    e.preventDefault()
+  useEffect(() => {
+    fetchGeneratedFiles().catch((err) => {
+      setError(err.message || 'Failed to load generated files')
+    })
+  }, [])
+
+  async function handleOpenFilePicker() {
+    setError('')
+    try {
+      await fetchGeneratedFiles()
+      setIsFilePickerOpen(true)
+    } catch (err) {
+      setError(err.message || 'Failed to load generated files')
+    }
+  }
+
+  function handleSelectFile(file) {
+    setSelectedFile(file)
+    setIsFilePickerOpen(false)
+  }
+
+  async function handleRunTriage() {
+    if (!selectedFile?.path) {
+      setError('Load a log file first.')
+      return
+    }
+
     setLoading(true)
     setError('')
 
     try {
-      const endpoint = getEndpointForInputMode(inputMode)
+      const endpoint = getEndpointForFile(selectedFile)
 
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_path: filePath }),
+        body: JSON.stringify({ file_path: selectedFile.path }),
       })
 
       const payload = await response.json()
@@ -91,17 +111,17 @@ export default function App() {
       }
 
       const sortedResults = sortResults(payload.results || [])
-      const nextData = {
+      setData({
         summary: payload.summary || {},
         results: sortedResults,
-      }
+      })
 
-      setData(nextData)
-      setSelected(sortedResults[0] || null)
+      // Reset any previous normalized-event modal when a new triage run is executed.
+      setNormalizedModalEvent(null)
     } catch (err) {
       setError(err.message || 'Something went wrong')
       setData(null)
-      setSelected(null)
+      setNormalizedModalEvent(null)
     } finally {
       setLoading(false)
     }
@@ -115,7 +135,6 @@ export default function App() {
     )
   }, [data, priorityFilter])
 
-  // Reset paging whenever a new dataset is loaded, the filter changes, or the page size changes.
   useEffect(() => {
     setCurrentPage(1)
   }, [data, priorityFilter, pageSize])
@@ -142,45 +161,28 @@ export default function App() {
       </header>
 
       <section className="panel">
-        <form className="triage-form" onSubmit={handleRunTriage}>
-          <div className="field-group field-group-compact">
-            <label htmlFor="inputMode">Dataset type</label>
-            <select
-              id="inputMode"
-              value={inputMode}
-              onChange={(e) => setInputMode(e.target.value)}
-            >
-              <option value="raw_text">Raw Windows text log</option>
-              <option value="json_events">Generated JSON event dataset</option>
-            </select>
-          </div>
+        {/* Supervisor request: keep only two top buttons. */}
+        <div className="toolbar-row">
+          <button type="button" onClick={handleOpenFilePicker}>
+            Load logs
+          </button>
 
-          <div className="field-group">
-            <label htmlFor="filePath">Dataset file path</label>
-            <input
-              id="filePath"
-              type="text"
-              value={filePath}
-              onChange={(e) => setFilePath(e.target.value)}
-              placeholder="C:\PythonProjects\LogSentry\backend\data\generated\generated_events_2000.json"
-            />
-          </div>
-
-          <button type="submit" disabled={loading}>
+          <button type="button" onClick={handleRunTriage} disabled={loading || !selectedFile}>
             {loading ? 'Running...' : 'Run triage'}
           </button>
-        </form>
+        </div>
 
-        <div className="preset-row">
-          <button type="button" className="secondary-button" onClick={() => applyPreset('sample_raw')}>
-            Use sample raw log
-          </button>
-          <button type="button" className="secondary-button" onClick={() => applyPreset('generated_raw')}>
-            Use generated raw log
-          </button>
-          <button type="button" className="secondary-button" onClick={() => applyPreset('generated_json')}>
-            Use generated JSON dataset
-          </button>
+        <div className="selected-file-summary">
+          <p>
+            <strong>Default generated folder:</strong>{' '}
+            {generatedFolder || 'Loading generated folder...'}
+          </p>
+          <p>
+            <strong>Selected file:</strong>{' '}
+            {selectedFile
+              ? `${selectedFile.name} (${selectedFile.kind_label})`
+              : 'No file selected'}
+          </p>
         </div>
 
         {error ? <p className="error-text">{error}</p> : null}
@@ -196,6 +198,7 @@ export default function App() {
               setPriorityFilter={setPriorityFilter}
               resultCount={filteredResults.length}
             />
+
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}
@@ -209,23 +212,39 @@ export default function App() {
             />
           </section>
 
-          <section className="content-grid">
-            <div className="panel">
-              <EventTable rows={paginatedResults} onSelect={setSelected} selected={selected} />
-            </div>
+          <section className="panel table-panel">
+            <p className="table-helper-text">
+              Double-click a row to inspect the full normalized event in a pop-up window.
+            </p>
 
-            <div className="panel">
-              <EventDetailPanel event={selected} />
-            </div>
+            <EventTable
+              rows={paginatedResults}
+              onOpenNormalizedEvent={setNormalizedModalEvent}
+            />
           </section>
         </>
       ) : (
         <section className="panel empty-state">
           <p>
-            Run triage against either the canonical sample log or the generated 2,000-event dataset.
+            Load a generated .txt or .json log file, then run triage to populate the summary
+            cards and event table.
           </p>
         </section>
       )}
+
+      <GeneratedFilePickerModal
+        isOpen={isFilePickerOpen}
+        folder={generatedFolder}
+        files={availableFiles}
+        selectedFilePath={selectedFile?.path || ''}
+        onClose={() => setIsFilePickerOpen(false)}
+        onSelectFile={handleSelectFile}
+      />
+
+      <NormalizedEventModal
+        event={normalizedModalEvent}
+        onClose={() => setNormalizedModalEvent(null)}
+      />
     </div>
   )
 }

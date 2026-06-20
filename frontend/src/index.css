@@ -364,3 +364,170 @@ button:disabled {
 .page-indicator {
   color: #5d6875;
 }
+
+/* Supervisor feedback implementation:
+   - only two top buttons
+   - generated-folder file picker modal
+   - colour-coded summary cards
+   - full-width table layout
+   - normalized event popup on double-click
+*/
+
+.toolbar-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.selected-file-summary {
+  margin-top: 12px;
+  color: #5d6875;
+}
+
+.selected-file-summary p {
+  margin: 4px 0;
+}
+
+/* Colour-code the summary boxes so the key results stand out more clearly */
+.summary-card-total {
+  background: #eef4ff;
+  border-color: #bfdbfe;
+}
+
+.summary-card-priority {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.summary-card-event {
+  background: #eefaf3;
+  border-color: #bbf7d0;
+}
+
+.summary-card-attack {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+
+/* Full-width table panel */
+.table-panel {
+  width: 100%;
+}
+
+.table-helper-text {
+  margin: 0 0 12px;
+  color: #5d6875;
+}
+
+/* Widen the key analytical columns now that the table contains the main detail view */
+.event-table th:nth-child(5),
+.event-table td:nth-child(5) {
+  min-width: 240px;
+}
+
+.event-table th:nth-child(10),
+.event-table td:nth-child(10) {
+  min-width: 320px;
+}
+
+.event-table th:nth-child(11),
+.event-table td:nth-child(11) {
+  min-width: 300px;
+}
+
+.event-table tbody tr {
+  cursor: default;
+}
+
+.event-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* Modal windows used for file loading and normalized-event inspection */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+
+.modal-window {
+  width: min(960px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #dde3ea;
+  padding: 20px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.22);
+}
+
+.file-picker-modal {
+  width: min(760px, 100%);
+}
+
+.normalized-event-modal {
+  width: min(1100px, 100%);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.modal-header h2 {
+  margin: 0 0 4px;
+}
+
+.modal-subtitle {
+  margin: 0;
+  color: #5d6875;
+}
+
+.modal-folder-path {
+  margin-bottom: 14px;
+  color: #5d6875;
+  word-break: break-word;
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.file-option {
+  text-align: left;
+  border: 1px solid #dde3ea;
+  background: #ffffff;
+  color: #1a1a1a;
+  padding: 14px 16px;
+  border-radius: 12px;
+}
+
+.file-option:hover {
+  background: #f8fafc;
+}
+
+.file-option-selected {
+  border-color: #1d4ed8;
+  background: #eef4ff;
+}
+
+.file-option-name {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.file-option-meta {
+  display: block;
+  color: #5d6875;
+}

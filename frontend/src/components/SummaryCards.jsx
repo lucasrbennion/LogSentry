@@ -6,12 +6,12 @@ export default function SummaryCards({ summary }) {
 
   return (
     <section className="summary-grid">
-      <div className="summary-card">
+      <div className="summary-card summary-card-total">
         <span className="summary-label">Total events</span>
         <strong className="summary-value">{summary?.total_events ?? 0}</strong>
       </div>
 
-      <div className="summary-card">
+      <div className="summary-card summary-card-priority">
         <span className="summary-label">Priority breakdown</span>
         <div className="stack-list">
           {priorityBreakdown.length ? (
@@ -27,7 +27,7 @@ export default function SummaryCards({ summary }) {
         </div>
       </div>
 
-      <div className="summary-card">
+      <div className="summary-card summary-card-event">
         <span className="summary-label">Event ID breakdown</span>
         <div className="stack-list">
           {eventBreakdown.length ? (
@@ -43,8 +43,8 @@ export default function SummaryCards({ summary }) {
         </div>
       </div>
 
-      <div className="summary-card">
-        <span className="summary-label">ATT&CK techniques observed</span>
+      <div className="summary-card summary-card-attack">
+        <span className="summary-label">ATT&amp;CK techniques observed</span>
         <div className="stack-list">
           {attackBreakdown.length ? (
             attackBreakdown.map(([techniqueId, count]) => (
@@ -54,7 +54,7 @@ export default function SummaryCards({ summary }) {
               </div>
             ))
           ) : (
-            <span className="muted-text">No ATT&CK mappings yet</span>
+            <span className="muted-text">No ATT&amp;CK mappings yet</span>
           )}
         </div>
       </div>

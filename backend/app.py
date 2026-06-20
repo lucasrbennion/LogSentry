@@ -1,12 +1,14 @@
 # app.py — the main entry point for the LogSentry Flask API.
 # It exposes:
-#   1. /triage           — triage event dicts passed directly in the request body
-#   2. /triage-file      — triage a raw Windows event-log text file by path
-#   3. /triage-json-file — triage a JSON file containing a large generated event dataset
+#   1. /triage            — triage event dicts passed directly in the request body
+#   2. /triage-file       — triage a raw Windows event-log text file by path
+#   3. /triage-json-file  — triage a JSON file containing a generated event dataset
+#   4. /generated-files   — list compatible .txt/.json datasets from backend/data/generated
 #
-# The JSON-file route is useful for scale testing because it avoids having to paste or
-# upload thousands of events through the frontend.  The frontend can simply provide a
-# file path, and the backend loads the dataset locally.
+# The generated-files route exists to support a cleaner UI workflow:
+# the frontend no longer asks the user to type long Windows file paths manually.
+# Instead, the app loads the default generated-data folder and lets the user
+# choose a compatible file from inside the interface.
 
 from __future__ import annotations
 
@@ -20,6 +22,10 @@ from rules import evaluate_event
 from scoring import score_event, summarise_results
 
 app = Flask(__name__)
+
+# The default folder that the frontend should "point to" when loading datasets.
+# Keeping this on the backend avoids fragile hard-coded paths in the browser UI.
+GENERATED_DATA_DIR = Path(__file__).resolve().parent / "data" / "generated"
 
 
 def run_triage(events: list[dict]) -> dict:
@@ -68,10 +74,58 @@ def load_events_from_json_file(path: Path) -> list[dict]:
     return events
 
 
+def list_generated_dataset_files() -> list[dict]:
+    """Return compatible dataset files from the generated-data folder.
+
+    Only .txt and .json files are returned because those are the two dataset
+    shapes the current application can triage through the UI.
+    """
+    if not GENERATED_DATA_DIR.exists():
+        return []
+
+    files = []
+    for path in sorted(GENERATED_DATA_DIR.iterdir()):
+        if not path.is_file():
+            continue
+
+        suffix = path.suffix.lower()
+        if suffix not in {".txt", ".json"}:
+            continue
+
+        kind = "json_events" if suffix == ".json" else "raw_text"
+        kind_label = "Generated JSON event dataset" if kind == "json_events" else "Raw Windows text log"
+
+        files.append(
+            {
+                "name": path.name,
+                "path": str(path),
+                "kind": kind,
+                "kind_label": kind_label,
+            }
+        )
+
+    return files
+
+
 @app.get("/health")
 def health():
     """Simple liveness check used by the frontend and local debugging."""
     return jsonify({"status": "ok", "app": "LogSentry"})
+
+
+@app.get("/generated-files")
+def generated_files():
+    """Return the generated-data folder path and the compatible files inside it.
+
+    The frontend uses this route to populate the in-app "Load logs" picker so that
+    the user can choose a .txt or .json dataset without typing a path manually.
+    """
+    return jsonify(
+        {
+            "folder": str(GENERATED_DATA_DIR),
+            "files": list_generated_dataset_files(),
+        }
+    )
 
 
 @app.post("/triage")
@@ -108,11 +162,7 @@ def triage_file():
 
 @app.post("/triage-json-file")
 def triage_json_file():
-    """Accept a path to a JSON file containing a large event dataset and return triage results.
-
-    This route is intended for scale testing with generated datasets such as:
-      backend/data/generated/generated_events_2000.json
-    """
+    """Accept a path to a JSON file containing a large event dataset and return triage results."""
     payload = request.get_json(silent=True) or {}
     file_path = payload.get("file_path")
 
