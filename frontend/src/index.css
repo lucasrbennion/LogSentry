@@ -638,3 +638,64 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* Sortable table headers */
+.sortable-header-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sortable-header-button:hover {
+  color: #1d4ed8;
+}
+
+.sortable-header-button-active {
+  color: #1d4ed8;
+}
+
+.sort-indicator {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+/* Dual horizontal scrolling support:
+   one scrollbar above the table and the existing one below it. */
+.table-region {
+  width: 100%;
+}
+
+.table-scrollbar-top {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-bottom: 8px;
+}
+
+.table-scrollbar-spacer {
+  height: 1px;
+}
+
+/* Give the top scrollbar a bit more presence so it is actually usable */
+.table-scrollbar-top::-webkit-scrollbar,
+.table-wrap::-webkit-scrollbar {
+  height: 12px;
+}
+
+.table-scrollbar-top::-webkit-scrollbar-thumb,
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.table-scrollbar-top::-webkit-scrollbar-track,
+.table-wrap::-webkit-scrollbar-track {
+  background: #eef2f7;
+  border-radius: 999px;
+}

@@ -1,188 +1,320 @@
-# app.py — the main entry point for the LogSentry Flask API.
-# It exposes:
-#   1. /triage            — triage event dicts passed directly in the request body
-#   2. /triage-file       — triage a raw Windows event-log text file by path
-#   3. /triage-json-file  — triage a JSON file containing a generated event dataset
-#   4. /generated-files   — list compatible .txt/.json datasets from backend/data/generated
-#
-# The generated-files route exists to support a cleaner UI workflow:
-# the frontend no longer asks the user to type long Windows file paths manually.
-# Instead, the app loads the default generated-data folder and lets the user
-# choose a compatible file from inside the interface.
+import { useEffect, useMemo, useState } from 'react'
+import SummaryCards from './components/SummaryCards'
+import EventTable from './components/EventTable'
+import FilterBar from './components/FilterBar'
+import PaginationControls from './components/PaginationControls'
+import GeneratedFilePickerModal from './components/GeneratedFilePickerModal'
+import NormalizedEventModal from './components/NormalizedEventModal'
+import PriorityGuide from './components/PriorityGuide'
+import AttackTechniqueGuide from './components/AttackTechniqueGuide'
 
-from __future__ import annotations
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 250]
 
-import json
-from pathlib import Path
+function getEndpointForFile(file) {
+  if (!file) return null
+  return file.kind === 'json_events' ? '/api/triage-json-file' : '/api/triage-file'
+}
 
-from flask import Flask, jsonify, request
+function parseTimestamp(value) {
+  // The app currently receives timestamps like "13/06/2026 21:05:13".
+  // Convert them into a comparable numeric value so table sorting behaves like
+  // a real date sort rather than a naive string sort.
+  if (!value || typeof value !== 'string') {
+    return Number.NEGATIVE_INFINITY
+  }
 
-from parser import normalize_events, parse_file
-from rules import evaluate_event
-from scoring import score_event, summarise_results
+  const [datePart, timePart = '00:00:00'] = value.split(' ')
+  const [day = '01', month = '01', year = '1970'] = datePart.split('/')
+  const isoLike = `${year}-${month}-${day}T${timePart}`
+  const parsed = Date.parse(isoLike)
 
-app = Flask(__name__)
+  return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed
+}
 
-# The default folder that the frontend should "point to" when loading datasets.
-# Keeping this on the backend avoids fragile hard-coded paths in the browser UI.
-GENERATED_DATA_DIR = Path(__file__).resolve().parent / "data" / "generated"
+function compareByPriority(a, b) {
+  const priorityOrder = { P1: 1, P2: 2, P3: 3, P4: 4 }
+  const pa = priorityOrder[a.priority] ?? 99
+  const pb = priorityOrder[b.priority] ?? 99
+  return pa - pb
+}
 
+function sortResults(results, sortConfig) {
+  // Sorting is done in App rather than EventTable because pagination should operate
+  // on the already-sorted result set, not on the original unsorted rows.
+  const { field, direction } = sortConfig
+  const multiplier = direction === 'desc' ? -1 : 1
 
-def run_triage(events: list[dict]) -> dict:
-    """Run every event through the rule engine and scorer, then return a summary."""
-    results = []
+  return [...results].sort((a, b) => {
+    let comparison = 0
 
-    for event in events:
-        rule_hits = evaluate_event(event)
-        triaged = score_event(event, rule_hits)
-        results.append(triaged)
+    if (field === 'timestamp') {
+      comparison = parseTimestamp(a.timestamp) - parseTimestamp(b.timestamp)
+    } else if (field === 'event_id') {
+      comparison = (a.event_id ?? -1) - (b.event_id ?? -1)
+    } else if (field === 'priority') {
+      comparison = compareByPriority(a, b)
+    }
 
-    summary = summarise_results(results)
-    return {"summary": summary, "results": results}
+    // Stable fallback ordering so rows do not jump around unpredictably when the
+    // primary sort field is tied.
+    if (comparison === 0) {
+      comparison = parseTimestamp(a.timestamp) - parseTimestamp(b.timestamp)
+    }
+    if (comparison === 0) {
+      comparison = (a.event_id ?? -1) - (b.event_id ?? -1)
+    }
 
+    return comparison * multiplier
+  })
+}
 
-def load_events_from_json_file(path: Path) -> list[dict]:
-    """Load an event list from a JSON file.
+export default function App() {
+  const [availableFiles, setAvailableFiles] = useState([])
+  const [generatedFolder, setGeneratedFolder] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [isFilePickerOpen, setIsFilePickerOpen] = useState(false)
 
-    Supported file shapes:
-      1. A top-level list:
-           [ {...}, {...} ]
+  const [data, setData] = useState(null)
+  const [priorityFilter, setPriorityFilter] = useState('ALL')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
 
-      2. A dict with an "events" property:
-           { "events": [ {...}, {...} ] }
+  // Default sort preserves the current "most urgent first" behaviour while now allowing
+  // the user to change it interactively from the table header.
+  const [sortConfig, setSortConfig] = useState({
+    field: 'priority',
+    direction: 'asc',
+  })
 
-    The returned list is still passed through normalize_events so the rest of the
-    backend can treat it exactly like any other input source.
-    """
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid JSON file: {exc}") from exc
+  const [normalizedModalEvent, setNormalizedModalEvent] = useState(null)
 
-    if isinstance(payload, list):
-        events = payload
-    elif isinstance(payload, dict):
-        events = payload.get("events", [])
-    else:
-        raise ValueError("JSON file must contain either a list of events or an object with an 'events' key.")
+  async function fetchGeneratedFiles() {
+    const response = await fetch('/api/generated-files')
+    const payload = await response.json()
 
-    if not isinstance(events, list):
-        raise ValueError("'events' must be a list.")
-    if not events:
-        raise ValueError("No events found in JSON file.")
+    if (!response.ok) {
+      throw new Error(payload.error || 'Failed to load generated files')
+    }
 
-    return events
+    setGeneratedFolder(payload.folder || '')
+    setAvailableFiles(payload.files || [])
 
+    if (!selectedFile && payload.files?.length) {
+      setSelectedFile(payload.files[0])
+    }
+  }
 
-def list_generated_dataset_files() -> list[dict]:
-    """Return compatible dataset files from the generated-data folder.
+  useEffect(() => {
+    fetchGeneratedFiles().catch((err) => {
+      setError(err.message || 'Failed to load generated files')
+    })
+  }, [])
 
-    Only .txt and .json files are returned because those are the two dataset
-    shapes the current application can triage through the UI.
-    """
-    if not GENERATED_DATA_DIR.exists():
-        return []
+  async function handleOpenFilePicker() {
+    setError('')
+    try {
+      await fetchGeneratedFiles()
+      setIsFilePickerOpen(true)
+    } catch (err) {
+      setError(err.message || 'Failed to load generated files')
+    }
+  }
 
-    files = []
-    for path in sorted(GENERATED_DATA_DIR.iterdir()):
-        if not path.is_file():
-            continue
+  function handleSelectFile(file) {
+    setSelectedFile(file)
+    setIsFilePickerOpen(false)
+  }
 
-        suffix = path.suffix.lower()
-        if suffix not in {".txt", ".json"}:
-            continue
-
-        kind = "json_events" if suffix == ".json" else "raw_text"
-        kind_label = "Generated JSON event dataset" if kind == "json_events" else "Raw Windows text log"
-
-        files.append(
-            {
-                "name": path.name,
-                "path": str(path),
-                "kind": kind,
-                "kind_label": kind_label,
-            }
-        )
-
-    return files
-
-
-@app.get("/health")
-def health():
-    """Simple liveness check used by the frontend and local debugging."""
-    return jsonify({"status": "ok", "app": "LogSentry"})
-
-
-@app.get("/generated-files")
-def generated_files():
-    """Return the generated-data folder path and the compatible files inside it.
-
-    The frontend uses this route to populate the in-app "Load logs" picker so that
-    the user can choose a .txt or .json dataset without typing a path manually.
-    """
-    return jsonify(
-        {
-            "folder": str(GENERATED_DATA_DIR),
-            "files": list_generated_dataset_files(),
+  function handleSortChange(field) {
+    // Clicking the same sortable header toggles direction.
+    // Clicking a different sortable header starts with ascending order.
+    setSortConfig((current) => {
+      if (current.field === field) {
+        return {
+          field,
+          direction: current.direction === 'asc' ? 'desc' : 'asc',
         }
+      }
+
+      return {
+        field,
+        direction: 'asc',
+      }
+    })
+  }
+
+  async function handleRunTriage() {
+    if (!selectedFile?.path) {
+      setError('Load a log file first.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const endpoint = getEndpointForFile(selectedFile)
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_path: selectedFile.path }),
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Backend request failed')
+      }
+
+      // Keep the raw result order from the backend and apply UI sorting separately.
+      // That makes the header sorting predictable and easier to reason about.
+      setData({
+        summary: payload.summary || {},
+        results: payload.results || [],
+      })
+
+      setNormalizedModalEvent(null)
+    } catch (err) {
+      setError(err.message || 'Something went wrong')
+      setData(null)
+      setNormalizedModalEvent(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredResults = useMemo(() => {
+    if (!data?.results) return []
+
+    return data.results.filter((row) =>
+      priorityFilter === 'ALL' ? true : row.priority === priorityFilter
     )
+  }, [data, priorityFilter])
 
+  const sortedResults = useMemo(() => {
+    return sortResults(filteredResults, sortConfig)
+  }, [filteredResults, sortConfig])
 
-@app.post("/triage")
-def triage():
-    """Accept a list of event dicts directly in the request body and return triage results."""
-    payload = request.get_json(silent=True) or {}
-    raw_events = payload.get("events", [])
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [data, priorityFilter, pageSize, sortConfig])
 
-    if not raw_events:
-        return jsonify({"error": "No events provided in payload"}), 400
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(sortedResults.length / pageSize))
+  }, [sortedResults.length, pageSize])
 
-    normalized = normalize_events(raw_events)
-    output = run_triage(normalized)
-    return jsonify(output)
+  const paginatedResults = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    const end = start + pageSize
+    return sortedResults.slice(start, end)
+  }, [sortedResults, currentPage, pageSize])
 
+  return (
+    <div className="app-shell">
+      <header className="page-header">
+        <div>
+          <h1>LogSentry</h1>
+          <p className="subtitle">
+            Rule-based triage and prioritisation of Windows Security Event Logs.
+          </p>
+        </div>
+      </header>
 
-@app.post("/triage-file")
-def triage_file():
-    """Accept a path to a raw Windows event-log text file and return triage results."""
-    payload = request.get_json(silent=True) or {}
-    file_path = payload.get("file_path")
+      <section className="panel">
+        <div className="toolbar-row">
+          <button type="button" onClick={handleOpenFilePicker}>
+            Load logs
+          </button>
 
-    if not file_path:
-        return jsonify({"error": "file_path is required"}), 400
+          <button type="button" onClick={handleRunTriage} disabled={loading || !selectedFile}>
+            {loading ? 'Running...' : 'Run triage'}
+          </button>
+        </div>
 
-    path = Path(file_path)
-    if not path.exists():
-        return jsonify({"error": f"File not found: {file_path}"}), 404
+        <div className="selected-file-summary">
+          <p>
+            <strong>Default generated folder:</strong>{' '}
+            {generatedFolder || 'Loading generated folder...'}
+          </p>
+          <p>
+            <strong>Selected file:</strong>{' '}
+            {selectedFile
+              ? `${selectedFile.name} (${selectedFile.kind_label})`
+              : 'No file selected'}
+          </p>
+        </div>
 
-    parsed_events = parse_file(path)
-    output = run_triage(parsed_events)
-    return jsonify(output)
+        {error ? <p className="error-text">{error}</p> : null}
+      </section>
 
+      {data ? (
+        <>
+          <SummaryCards summary={data.summary} />
 
-@app.post("/triage-json-file")
-def triage_json_file():
-    """Accept a path to a JSON file containing a large event dataset and return triage results."""
-    payload = request.get_json(silent=True) or {}
-    file_path = payload.get("file_path")
+          <section className="guidance-grid">
+            <PriorityGuide />
+            <AttackTechniqueGuide results={data.results} />
+          </section>
 
-    if not file_path:
-        return jsonify({"error": "file_path is required"}), 400
+          <section className="panel">
+            <FilterBar
+              priorityFilter={priorityFilter}
+              setPriorityFilter={setPriorityFilter}
+              resultCount={sortedResults.length}
+            />
 
-    path = Path(file_path)
-    if not path.exists():
-        return jsonify({"error": f"File not found: {file_path}"}), 404
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              totalRows={sortedResults.length}
+              visibleRows={paginatedResults.length}
+              onPageSizeChange={setPageSize}
+              onPreviousPage={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              onNextPage={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+            />
+          </section>
 
-    try:
-        raw_events = load_events_from_json_file(path)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+          <section className="panel table-panel">
+            <p className="table-helper-text">
+              Click Time, Event ID, or Priority to sort. Double-click a row to inspect the
+              full normalized event in a pop-up window.
+            </p>
 
-    normalized = normalize_events(raw_events)
-    output = run_triage(normalized)
-    return jsonify(output)
+            <EventTable
+              rows={paginatedResults}
+              sortConfig={sortConfig}
+              onSortChange={handleSortChange}
+              onOpenNormalizedEvent={setNormalizedModalEvent}
+            />
+          </section>
+        </>
+      ) : (
+        <section className="panel empty-state">
+          <p>
+            Load a generated .txt or .json log file, then run triage to populate the summary
+            cards and event table.
+          </p>
+        </section>
+      )}
 
+      <GeneratedFilePickerModal
+        isOpen={isFilePickerOpen}
+        folder={generatedFolder}
+        files={availableFiles}
+        selectedFilePath={selectedFile?.path || ''}
+        onClose={() => setIsFilePickerOpen(false)}
+        onSelectFile={handleSelectFile}
+      />
 
-if __name__ == "__main__":
-    # Development server only.
-    app.run(debug=True, host="127.0.0.1", port=5000)
+      <NormalizedEventModal
+        event={normalizedModalEvent}
+        onClose={() => setNormalizedModalEvent(null)}
+      />
+    </div>
+  )
+}
