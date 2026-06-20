@@ -200,10 +200,40 @@ def _looks_normalized_event(event: Dict[str, Any]) -> bool:
 
 
 def _normalize_pre_normalized_event(event: Dict[str, Any]) -> Dict[str, Any]:
-    """Return a safe copy of an already-normalized event with missing fields defaulted."""
+    """Return a safe copy of an already-normalized event with missing fields defaulted.
+
+    Generated datasets sometimes carry extra helper fields such as:
+      - extra_new_account
+      - extra_deleted_account
+      - extra_member_account
+      - extra_group_name
+
+    This function maps those helper fields into the stable LogSentry schema so
+    downstream code can render a meaningful account and group context in the UI.
+    """
     privileges = event.get("privileges") or []
     if isinstance(privileges, str):
         privileges = [privileges]
+
+    object_account = (
+        event.get("object_account")
+        or event.get("extra_new_account")
+        or event.get("extra_deleted_account")
+        or event.get("extra_member_account")
+    )
+    object_domain = (
+        event.get("object_domain")
+        or event.get("extra_new_account_domain")
+        or event.get("extra_deleted_account_domain")
+    )
+    object_security_id = (
+        event.get("object_security_id")
+        or event.get("extra_new_account_sid")
+        or event.get("extra_deleted_account_sid")
+        or event.get("extra_member_sid")
+    )
+    group_name = event.get("group_name") or event.get("extra_group_name")
+    group_domain = event.get("group_domain") or event.get("extra_group_domain")
 
     return {
         "event_id": event.get("event_id"),
@@ -222,6 +252,11 @@ def _normalize_pre_normalized_event(event: Dict[str, Any]) -> Dict[str, Any]:
         "target_account": event.get("target_account"),
         "target_domain": event.get("target_domain"),
         "target_security_id": event.get("target_security_id"),
+        "object_account": object_account,
+        "object_domain": object_domain,
+        "object_security_id": object_security_id,
+        "group_name": group_name,
+        "group_domain": group_domain,
         "logon_type": event.get("logon_type"),
         "elevated_token": event.get("elevated_token"),
         "virtual_account": event.get("virtual_account"),
@@ -240,18 +275,20 @@ def _normalize_pre_normalized_event(event: Dict[str, Any]) -> Dict[str, Any]:
         "raw_record": event.get("raw_record"),
     }
 
+
 def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
     """Flatten the nested parsed event dict into a single-level dict with consistent field names.
 
-    The raw parsed dict mirrors the Windows log structure with nested sections like
-    'Subject', 'New Logon', 'Failure Information', etc.  This function extracts the
-    fields that matter for triage and gives them stable snake_case names so the rest
-    of the app doesn't need to know the raw section layout.
+    This function supports both:
+      1. raw parsed Windows events with nested sections (Subject, New Logon, Group, etc.)
+      2. already-normalized generated events from JSON datasets
 
-    Fields that have no value in this event are set to None rather than omitted, so
-    downstream code can always do event.get("field") without KeyError surprises.
+    It also extracts "object" fields for account/group-management events so the UI can
+    display the account that was created, deleted, or added to a group.
     """
-    # Pull each section dict out (defaulting to empty dict if the section wasn't in the log).
+    if _looks_normalized_event(event):
+        return _normalize_pre_normalized_event(event)
+
     subject = event.get("Subject", {})
     new_logon = event.get("New Logon", {})
     failed = event.get("Account For Which Logon Failed", {})
@@ -261,7 +298,12 @@ def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
     process_info = event.get("Process Information", {})
     details = event.get("Detailed Authentication Information", {})
 
-    # Privileges may live in several places depending on event type; check them all.
+    # Account-management and group-management sections.
+    new_account = event.get("New Account", {})
+    deleted_account = event.get("Deleted Account", {})
+    member = event.get("Member", {})
+    group = event.get("Group", {})
+
     privileges = (
         event.get("Privileges")
         or event.get("privileges")
@@ -269,8 +311,22 @@ def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
         or []
     )
     if isinstance(privileges, str):
-        # Occasionally parsed as a bare string instead of a list — normalise.
         privileges = [privileges]
+
+    object_account = (
+        new_account.get("Account Name")
+        or deleted_account.get("Account Name")
+        or member.get("Account Name")
+    )
+    object_domain = (
+        new_account.get("Account Domain")
+        or deleted_account.get("Account Domain")
+    )
+    object_security_id = (
+        new_account.get("Security ID")
+        or deleted_account.get("Security ID")
+        or member.get("Security ID")
+    )
 
     return {
         "event_id": event.get("event_id"),
@@ -278,39 +334,38 @@ def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
         "provider_name": event.get("provider_name"),
         "machine_name": event.get("machine_name"),
         "message": event.get("message"),
-        # The account that initiated the action (e.g. the admin who created a new user).
         "subject_account": subject.get("Account Name"),
         "subject_domain": subject.get("Account Domain"),
         "subject_security_id": subject.get("Security ID"),
         "subject_logon_id": subject.get("Logon ID"),
-        # The account that was logged on (present on event 4624 successful logon).
         "new_logon_account": new_logon.get("Account Name"),
         "new_logon_domain": new_logon.get("Account Domain"),
         "new_logon_security_id": new_logon.get("Security ID"),
         "new_logon_logon_id": new_logon.get("Logon ID"),
-        # The account whose logon failed (present on event 4625 failed logon).
         "target_account": failed.get("Account Name"),
         "target_domain": failed.get("Account Domain"),
         "target_security_id": failed.get("Security ID"),
-        # Logon type codes: 2=interactive, 3=network, 5=service, 10=remote interactive, etc.
+        "object_account": object_account,
+        "object_domain": object_domain,
+        "object_security_id": object_security_id,
+        "group_name": group.get("Group Name"),
+        "group_domain": group.get("Group Domain"),
         "logon_type": logon_info.get("Logon Type") or event.get("Logon Type"),
         "elevated_token": logon_info.get("Elevated Token"),
         "virtual_account": logon_info.get("Virtual Account"),
         "restricted_admin_mode": logon_info.get("Restricted Admin Mode"),
-        # Network details — useful for identifying remote logon sources.
         "workstation_name": network.get("Workstation Name"),
         "source_network_address": network.get("Source Network Address"),
         "source_port": network.get("Source Port"),
-        # The process that triggered the logon event.
         "process_name": process_info.get("Process Name") or process_info.get("Caller Process Name"),
-        # Failure details — only present on event 4625.
         "failure_reason": failure_info.get("Failure Reason"),
         "status": failure_info.get("Status"),
         "substatus": failure_info.get("Sub Status"),
         "logon_process": details.get("Logon Process"),
         "authentication_package": details.get("Authentication Package"),
         "privileges": privileges,
-        "raw_record": event.get("raw_record"),  # keep the original text for display/debugging
+        "scenario_id": event.get("scenario_id"),
+        "raw_record": event.get("raw_record"),
     }
 
 

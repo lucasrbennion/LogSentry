@@ -40,6 +40,23 @@ def extract_attack_mappings(rule_hits: List[Dict]) -> List[Dict]:
     return mappings
 
 
+def choose_primary_account(event: Dict) -> str | None:
+    """Pick the most meaningful account to display for this event.
+
+    The display priority is intentionally event-centric rather than actor-centric:
+      - successful logon -> the logged-on account
+      - failed logon     -> the failed target account
+      - account/group mgmt -> the affected account/member
+      - fallback         -> the subject/initiator account
+    """
+    return (
+        event.get("new_logon_account")
+        or event.get("target_account")
+        or event.get("object_account")
+        or event.get("subject_account")
+    )
+
+
 def score_event(event: Dict, rule_hits: List[Dict]) -> Dict:
     """Turn matched rule hits into a scored triage result suitable for the API/UI."""
     effects = [rule["effect"] for rule in rule_hits]
@@ -58,7 +75,9 @@ def score_event(event: Dict, rule_hits: List[Dict]) -> Dict:
         "event_id": event.get("event_id"),
         "timestamp": event.get("timestamp"),
         "scenario_id": event.get("scenario_id"),
-        "account": event.get("new_logon_account") or event.get("target_account") or event.get("subject_account"),
+        "account": choose_primary_account(event),
+        "actor_account": event.get("subject_account"),
+        "group_name": event.get("group_name"),
         "machine_name": event.get("machine_name"),
         "provider_name": event.get("provider_name"),
         "message": event.get("message"),

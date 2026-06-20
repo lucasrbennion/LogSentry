@@ -5,12 +5,12 @@ import FilterBar from './components/FilterBar'
 import PaginationControls from './components/PaginationControls'
 import GeneratedFilePickerModal from './components/GeneratedFilePickerModal'
 import NormalizedEventModal from './components/NormalizedEventModal'
+import PriorityGuide from './components/PriorityGuide'
+import AttackTechniqueGuide from './components/AttackTechniqueGuide'
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250]
 
 function sortResults(results) {
-  // Sort by priority first so the most urgent events surface to the top,
-  // then by timestamp to keep same-priority events in chronological order.
   const priorityOrder = { P1: 1, P2: 2, P3: 3, P4: 4 }
 
   return [...results].sort((a, b) => {
@@ -23,9 +23,6 @@ function sortResults(results) {
 }
 
 function getEndpointForFile(file) {
-  // The selected file already carries a backend-generated "kind".
-  // That lets the UI route .txt and .json datasets cleanly without exposing
-  // any extra complexity to the user.
   if (!file) return null
   return file.kind === 'json_events' ? '/api/triage-json-file' : '/api/triage-file'
 }
@@ -46,9 +43,6 @@ export default function App() {
   const [normalizedModalEvent, setNormalizedModalEvent] = useState(null)
 
   async function fetchGeneratedFiles() {
-    // Load the default generated-data folder listing from the backend.
-    // This is the cleanest way to "point the app" to the correct folder
-    // without asking the user to type long Windows paths manually.
     const response = await fetch('/api/generated-files')
     const payload = await response.json()
 
@@ -59,7 +53,6 @@ export default function App() {
     setGeneratedFolder(payload.folder || '')
     setAvailableFiles(payload.files || [])
 
-    // Auto-select the first compatible file if nothing is currently selected.
     if (!selectedFile && payload.files?.length) {
       setSelectedFile(payload.files[0])
     }
@@ -116,7 +109,6 @@ export default function App() {
         results: sortedResults,
       })
 
-      // Reset any previous normalized-event modal when a new triage run is executed.
       setNormalizedModalEvent(null)
     } catch (err) {
       setError(err.message || 'Something went wrong')
@@ -161,7 +153,6 @@ export default function App() {
       </header>
 
       <section className="panel">
-        {/* Supervisor request: keep only two top buttons. */}
         <div className="toolbar-row">
           <button type="button" onClick={handleOpenFilePicker}>
             Load logs
@@ -191,6 +182,11 @@ export default function App() {
       {data ? (
         <>
           <SummaryCards summary={data.summary} />
+
+          <section className="guidance-grid">
+            <PriorityGuide />
+            <AttackTechniqueGuide results={data.results} />
+          </section>
 
           <section className="panel">
             <FilterBar

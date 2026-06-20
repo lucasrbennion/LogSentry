@@ -1,7 +1,6 @@
 import PriorityBadge from './PriorityBadge'
 
 function formatAttackMappings(attackMappings) {
-  // Show concise ATT&CK technique IDs in the table so the grid stays readable.
   if (!attackMappings?.length) {
     return '-'
   }
@@ -12,8 +11,6 @@ function formatAttackMappings(attackMappings) {
 }
 
 function formatRuleHits(ruleHits) {
-  // Keep the rule-hit column compact by showing rule IDs and labels rather than
-  // the full explanatory text, which already appears in the Explanation column.
   if (!ruleHits?.length) {
     return '-'
   }
@@ -21,6 +18,28 @@ function formatRuleHits(ruleHits) {
   return ruleHits
     .map((rule) => `${rule.rule_id} (${rule.name})`)
     .join(' | ')
+}
+
+function renderAccountCell(row) {
+  // Show the most meaningful account first, then add supporting context when available.
+  // This makes account-management and group-management events much easier to interpret.
+  const primary = row.account || '-'
+  const actor = row.actor_account
+  const groupName = row.group_name
+
+  const showActor = actor && actor !== primary
+
+  return (
+    <div className="table-cell-stack">
+      <span>{primary}</span>
+      {showActor ? (
+        <span className="table-cell-subtext">Actor: {actor}</span>
+      ) : null}
+      {groupName ? (
+        <span className="table-cell-subtext">Group: {groupName}</span>
+      ) : null}
+    </div>
+  )
 }
 
 export default function EventTable({ rows, onOpenNormalizedEvent }) {
@@ -39,7 +58,6 @@ export default function EventTable({ rows, onOpenNormalizedEvent }) {
             <th>Machine</th>
             <th>Message</th>
             <th>ATT&amp;CK</th>
-            <th>Logon Type</th>
             <th>Priority</th>
             <th>Owner</th>
             <th>Explanation</th>
@@ -56,11 +74,10 @@ export default function EventTable({ rows, onOpenNormalizedEvent }) {
             >
               <td>{row.timestamp || '-'}</td>
               <td>{row.event_id}</td>
-              <td>{row.account || '-'}</td>
+              <td>{renderAccountCell(row)}</td>
               <td>{row.machine_name || '-'}</td>
               <td>{row.message || '-'}</td>
               <td>{formatAttackMappings(row.attack_mappings)}</td>
-              <td>{row.logon_type || '-'}</td>
               <td>
                 <PriorityBadge priority={row.priority} />
               </td>
